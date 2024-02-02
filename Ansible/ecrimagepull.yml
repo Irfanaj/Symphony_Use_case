@@ -1,0 +1,72 @@
+- name: Authenticate with AWS ECR and Pull Docker Images
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Install sshpass on localhost
+      become: true
+      apt:
+        name: sshpass
+        state: present
+
+- name: Docker tasks on target servers
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Install awscli on target servers
+      become: true
+      apt:
+        name: awscli
+        state: present
+
+    - name: Set AWS credentials
+      set_fact:
+        aws_access_key: "AKIARBG5NJFCCB7EPJHV"
+        aws_secret_key: "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"
+        aws_region: "us-east-1"
+
+    - name: Configure AWS credentials on target servers
+      command: "aws configure set aws_access_key_id {{ aws_access_key }}"
+      become: true
+
+    - name: Configure AWS secret key on target servers
+      command: "aws configure set aws_secret_access_key {{ aws_secret_key }}"
+      become: true
+
+    - name: Configure AWS region on target servers
+      command: "aws configure set region {{ aws_region }}"
+      become: true
+
+    - name: Install python3-pip on target servers
+      become: true
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install Docker Python library
+      pip:
+        name: docker
+      become: true
+
+    - name: Get ECR login password
+      command: "aws ecr get-login-password --region {{ aws_region }}"
+      register: ecr_login_result
+      become: true
+
+    - name: Docker login to ECR
+      command: "docker login --username AWS --password-stdin 071331301700.dkr.ecr.us-east-1.amazonaws.com"
+      args:
+        stdin: "{{ ecr_login_result.stdout }}"
+      become: true
+
+    - name: Pull Docker images
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      with_items:
+        - "071331301700.dkr.ecr.us-east-1.amazonaws.com/documentdb:API_redis_sentinel3"
+        - "071331301700.dkr.ecr.us-east-1.amazonaws.com/documentdb:UI4"
+        - "071331301700.dkr.ecr.us-east-1.amazonaws.com/documentdb:scheduler2"
+        - "071331301700.dkr.ecr.us-east-1.amazonaws.com/documentdb:DND_redis_sentinel2"
+      become: true
