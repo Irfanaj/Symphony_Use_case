@@ -1,0 +1,83 @@
+- name: Install Azure CLI on localhost and target servers
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Install Azure CLI on localhost
+      become: true
+      apt:
+        name: azure-cli
+        state: present
+
+- name: Authenticate with Azure ACR and Pull Docker Images
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - include_vars:
+      file: azsecrets.yml
+
+    - name: Install Docker on localhost
+      become: true
+      apt:
+        name: docker-ce
+        state: present
+
+    - name: Log in to Azure ACR on localhost using non-interactive mode
+      command: "az login --service-principal -u {{ azure_client_id }} -p {{ azure_client_secret }} --tenant {{ azure_tenant_id }}"
+      become: true
+
+    - name: Log in to Azure ACR on localhost
+      command: "az acr login --name ProdSymphony"
+      become: true
+
+    - name: Pull Docker images from Azure ACR on localhost
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      with_items:
+        - "prodsymphony.azurecr.io/baseimage:API_redis_sentinel3"
+        - "prodsymphony.azurecr.io/baseimage:UI4"
+        - "prodsymphony.azurecr.io/baseimage:scheduler2"
+        - "prodsymphony.azurecr.io/baseimage:DND_redis_sentinel2"
+      become: true
+
+- name: Docker tasks on target servers
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Install Docker on target servers
+      become: true
+      apt:
+        name: docker-ce
+        state: present
+
+    - name: Install Azure CLI on target servers
+      become: true
+      apt:
+        name: azure-cli
+        state: present
+
+    - name: Set Azure credentials on target servers
+      set_fact:
+        azure_subscription_id: "{{ hostvars['localhost']['azure_subscription_id'] }}"
+        azure_client_id: "{{ hostvars['localhost']['azure_client_id'] }}"
+        azure_client_secret: "{{ hostvars['localhost']['azure_client_secret'] }}"
+        azure_tenant_id: "{{ hostvars['localhost']['azure_tenant_id'] }}"
+
+    - name: Log in to Azure ACR on target servers using non-interactive mode
+      command: "az login --service-principal -u {{ azure_client_id }} -p {{ azure_client_secret }} --tenant {{ azure_tenant_id }}"
+      become: true
+
+    - name: Log in to Azure ACR on target servers
+      command: "az acr login --name ProdSymphony"
+      become: true
+
+    - name: Pull Docker images from Azure ACR on target servers
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      with_items:
+        - "prodsymphony.azurecr.io/baseimage:API_redis_sentinel3"
+        - "prodsymphony.azurecr.io/baseimage:UI4"
+        - "prodsymphony.azurecr.io/baseimage:scheduler2"
+        - "prodsymphony.azurecr.io/baseimage:DND_redis_sentinel2"
+      become: true
