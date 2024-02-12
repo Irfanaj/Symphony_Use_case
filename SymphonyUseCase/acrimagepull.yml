@@ -13,7 +13,7 @@
   gather_facts: false
   tasks:
     - include_vars:
-      file: azsecrets.yml
+        file: azsecrets.yml
 
     - name: Install Docker on localhost
       become: true
